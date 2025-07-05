@@ -19,16 +19,15 @@ def get_problem_details():
     leetcode_dir = 'leetcode'
     problems = []
     
-    problem_folders = [d for d in os.listdir(leetcode_dir) if os.path.isdir(os.path.join(leetcode_dir, d)) and d[0].isdigit()]
+    solution_files = [f for f in os.listdir(leetcode_dir) if f.endswith(('.py', '.java', '.c', '.go'))]
 
-    for folder_name in problem_folders:
-        problem_dir = os.path.join(leetcode_dir, folder_name)
-        
-        match = re.match(r'\d+-(.*)', folder_name)
+    for filename in solution_files:
+        match = re.match(r'(\d+)-(.+?)\.(py|java|c|go)', filename)
         if not match:
-            print(f"Skipping folder with unexpected name format: {folder_name}")
+            print(f"Skipping file with unexpected name format: {filename}")
             continue
-        title_slug = match.group(1)
+        
+        problem_number_str, title_slug, _ = match.groups()
 
         try:
             response = requests.post(LEETCODE_API_URL, json={'query': QUERY, 'variables': {'titleSlug': title_slug}}, timeout=10)
@@ -36,27 +35,13 @@ def get_problem_details():
             data = response.json().get('data', {}).get('question')
 
             if data:
-                number = int(data['questionId'])
-                title = data['title']
-                difficulty = data['difficulty']
-                url = f"https://leetcode.com/problems/{data['titleSlug']}"
-                
-                solution_files = [f for f in os.listdir(problem_dir) if f.endswith(('.py', '.java', '.c', '.go'))]
-                solution_path = os.path.join(folder_name, solution_files[0]) if solution_files else 'N/A'
-
                 problems.append({
-                    'number': number,
-                    'title': title,
-                    'difficulty': difficulty,
-                    'url': url,
-                    'solution_path': solution_path.replace('\\', '/')
+                    'number': int(data['questionId']),
+                    'title': data['title'],
+                    'difficulty': data['difficulty'],
+                    'url': f"https://leetcode.com/problems/{data['titleSlug']}",
+                    'solution_path': filename
                 })
-                
-                readme_path = os.path.join(problem_dir, 'README.md')
-                if os.path.exists(readme_path):
-                    print(f"Removing obsolete README: {readme_path}")
-                    os.remove(readme_path)
-
             else:
                 print(f"No data returned from API for slug: {title_slug}")
 
@@ -66,7 +51,6 @@ def get_problem_details():
             print(f"Could not parse API response for {title_slug}: {e}")
         
         time.sleep(1)
-
 
     return sorted(problems, key=lambda x: x['number'])
 
